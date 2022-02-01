@@ -1,0 +1,73 @@
+import path from "path";
+import resolve from "@rollup/plugin-node-resolve";
+import commonjs from "@rollup/plugin-commonjs";
+import babel from "@rollup/plugin-babel";
+import postcss from "rollup-plugin-postcss";
+import url from "@rollup/plugin-url";
+import copy from "rollup-plugin-copy";
+import del from "rollup-plugin-delete";
+import replace from "@rollup/plugin-replace";
+import livereload from "rollup-plugin-livereload";
+import serve from "rollup-plugin-serve";
+import { terser } from "rollup-plugin-terser";
+
+const isDev = process.env.ROLLUP_WATCH;
+const isProd = !isDev;
+
+export default async function config() {
+  return {
+    input: "src/main.jsx",
+    output: {
+      format: "es",
+      dir: path.resolve(__dirname, "build"),
+      sourcemap: isDev,
+      entryFileNames: "[name].mjs",
+      chunkFileNames: "[name].[hash].mjs",
+    },
+    plugins: [
+      del({
+        targets: "build/*",
+        runOnce: isDev,
+      }),
+      copy({
+        targets: [
+          {
+            src: "src/index.html",
+            dest: "build",
+          },
+        ],
+      }),
+      resolve(),
+      replace({
+        preventAssignment: true,
+        "process.env.NODE_ENV": JSON.stringify("production"),
+      }),
+      url(),
+      postcss({
+        minimize: isProd,
+        sourceMap: isDev,
+        extract: true,
+      }),
+      babel({
+        babelHelpers: "bundled",
+        presets: ["@babel/preset-env", "@babel/preset-react"],
+      }),
+      commonjs(),
+      isProd && terser(),
+      ...(isDev
+        ? [
+            serve({
+              contentBase: "build",
+              port: 3000,
+              onListening() {
+                console.log("Server started at http://localhost:3000");
+              },
+            }),
+            livereload({
+              watch: "build",
+            }),
+          ]
+        : []),
+    ],
+  };
+}
